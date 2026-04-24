@@ -9,6 +9,7 @@ async function api(path, options = {}) {
   const res = await fetch(`${API}${path}`, { ...options, headers });
   if (res.status === 401) { localStorage.removeItem("tcc_token"); window.location.reload(); return null; }
   if (!res.ok) { const err = await res.json().catch(() => ({ detail: "Request failed" })); throw new Error(err.detail || `Error ${res.status}`); }
+  if (res.status === 204) return null;
   return res.json();
 }
 
@@ -88,6 +89,7 @@ export default function App() {
   const [tab, setTab] = useState("dashboard");
   const [user, setUser] = useState(null);
   const [usersList, setUsersList] = useState([]); const [showNewUser, setShowNewUser] = useState(false); const [editingUser, setEditingUser] = useState(null);
+  const [newUser, setNewUser] = useState({ email: "", password: "", full_name: "", company: "Velani Goods and Services", role: "viewer" });
   const [stats, setStats] = useState(null);
   const [tenders, setTenders] = useState([]);
   const [rfps, setRfps] = useState([]);
@@ -129,7 +131,45 @@ export default function App() {
   useEffect(() => { if (tab === "users") loadUsers(); }, [tab, loadUsers]);
 
   const filteredTenders = velaniOnly ? tenders.filter(t => t.ai_match_score >= 38) : tenders;
-
+const handleUpdateUser = async () => {
+    if (!editingUser) return;
+    try {
+      const body = { full_name: editingUser.full_name, company: editingUser.company, role: editingUser.role, is_active: editingUser.is_active };
+      await api(`/users/${editingUser.id}`, { method: "PATCH", body: JSON.stringify(body) });
+      setEditingUser(null);
+      showToast("User updated");
+      loadUsers();
+    } catch (e) { showToast(e.message, "error"); }
+  };
+  const handleDeactivateUser = async () => {
+    if (!editingUser) return;
+    if (!confirm(`Deactivate ${editingUser.full_name}? They will no longer be able to log in.`)) return;
+    try {
+      await api(`/users/${editingUser.id}`, { method: "DELETE" });
+      setEditingUser(null);
+      showToast("User deactivated");
+      loadUsers();
+    } catch (e) { showToast(e.message, "error"); }
+  };
+  const handleResetUserPassword = async () => {
+    if (!editingUser) return;
+    const newPass = prompt(`Enter new password for ${editingUser.full_name} (min 8 chars):`);
+    if (!newPass || newPass.length < 8) { if (newPass !== null) showToast("Password must be at least 8 characters", "error"); return; }
+    try {
+      await api(`/users/${editingUser.id}/reset-password`, { method: "POST", body: JSON.stringify({ new_password: newPass }) });
+      showToast("Password reset successfully");
+    } catch (e) { showToast(e.message, "error"); }
+  };
+  const handleAddUser = async () => {
+    if (!newUser.email || !newUser.password || !newUser.full_name) { showToast("Email, password and name are required", "error"); return; }
+    try {
+      await api("/users", { method: "POST", body: JSON.stringify(newUser) });
+      setNewUser({ email: "", password: "", full_name: "", company: "Velani Goods and Services", role: "viewer" });
+      setShowNewUser(false);
+      showToast("User created");
+      loadUsers();
+    } catch (e) { showToast(e.message, "error"); }
+  };
   const handleAddRfp = async () => {
     if (!newRfp.client_name || !newRfp.product || !newRfp.quantity) return;
     try { const body = { ...newRfp }; if (body.deadline) body.deadline = new Date(body.deadline).toISOString(); else delete body.deadline; await api("/rfp/", { method: "POST", body: JSON.stringify(body) }); setNewRfp({ client_name: "", product: "", quantity: "", deadline: "" }); setShowNewRfp(false); showToast("RFP created"); loadData(); } catch (e) { showToast(e.message, "error"); }
@@ -422,6 +462,91 @@ export default function App() {
                   <Icon name="plus" size={16} /> New User
                 </button>
               </div>
+              {showNewUser && (
+                <div style={{ background: P.bgCard, borderRadius: 12, border: `1px solid ${P.accent}40`, padding: 24, marginBottom: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <span style={{ fontFamily: font, fontSize: 14, fontWeight: 600, color: P.accent }}>New User</span>
+                    <button onClick={() => setShowNewUser(false)} style={{ background: "transparent", border: "none", color: P.textMuted, cursor: "pointer" }}><Icon name="x" size={18} /></button>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Full Name *</label>
+                      <input value={newUser.full_name} onChange={e => setNewUser({ ...newUser, full_name: e.target.value })} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Email *</label>
+                      <input value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} type="email" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Password *</label>
+                      <input value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} type="password" placeholder="Min 8 characters" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Company</label>
+                      <input value={newUser.company} onChange={e => setNewUser({ ...newUser, company: e.target.value })} style={inputStyle} />
+                    </div>
+                    <div style={{ gridColumn: "span 2" }}>
+                      <label style={{ fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Role *</label>
+                      <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} style={inputStyle}>
+                        <option value="viewer">Viewer (read-only access)</option>
+                        <option value="procurement">Procurement (full tender/RFP access)</option>
+                        <option value="super_admin">Super Admin (full access + user management)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                    <button onClick={() => setShowNewUser(false)} style={{ background: "transparent", border: `1px solid ${P.border}`, color: P.textMuted, borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}>Cancel</button>
+                    <button onClick={handleAddUser} style={{ background: `linear-gradient(135deg, ${P.accent}, ${P.accentDark})`, color: "#000", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: fontBody }}>Create User</button>
+                  </div>
+                </div>
+              )}
+              {editingUser && (
+                <div style={{ background: P.bgCard, borderRadius: 12, border: `1px solid ${P.blue}40`, padding: 24, marginBottom: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <span style={{ fontFamily: font, fontSize: 14, fontWeight: 600, color: P.blue }}>Edit User &mdash; {editingUser.email}</span>
+                    <button onClick={() => setEditingUser(null)} style={{ background: "transparent", border: "none", color: P.textMuted, cursor: "pointer" }}><Icon name="x" size={18} /></button>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Full Name</label>
+                      <input value={editingUser.full_name || ""} onChange={e => setEditingUser({ ...editingUser, full_name: e.target.value })} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Company</label>
+                      <input value={editingUser.company || ""} onChange={e => setEditingUser({ ...editingUser, company: e.target.value })} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Role</label>
+                      <select value={editingUser.role} onChange={e => setEditingUser({ ...editingUser, role: e.target.value })} style={inputStyle} disabled={editingUser.id === user?.id}>
+                        <option value="viewer">Viewer</option>
+                        <option value="procurement">Procurement</option>
+                        <option value="super_admin">Super Admin</option>
+                      </select>
+                      {editingUser.id === user?.id && <div style={{ fontSize: 10, color: P.textDim, marginTop: 4 }}>You cannot change your own role</div>}
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Status</label>
+                      <select value={editingUser.is_active ? "active" : "inactive"} onChange={e => setEditingUser({ ...editingUser, is_active: e.target.value === "active" })} style={inputStyle} disabled={editingUser.id === user?.id}>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                      {editingUser.id === user?.id && <div style={{ fontSize: 10, color: P.textDim, marginTop: 4 }}>You cannot deactivate yourself</div>}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", paddingTop: 14, borderTop: `1px solid ${P.border}` }}>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={handleResetUserPassword} style={{ background: `${P.accent}15`, color: P.accent, border: `1px solid ${P.accent}30`, borderRadius: 6, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}>Reset Password</button>
+                      {editingUser.id !== user?.id && editingUser.is_active && (
+                        <button onClick={handleDeactivateUser} style={{ background: `${P.red}15`, color: P.red, border: `1px solid ${P.red}30`, borderRadius: 6, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}>Deactivate User</button>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button onClick={() => setEditingUser(null)} style={{ background: "transparent", border: `1px solid ${P.border}`, color: P.textMuted, borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}>Cancel</button>
+                      <button onClick={handleUpdateUser} style={{ background: `linear-gradient(135deg, ${P.blue}, ${P.blueDim})`, color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: fontBody }}>Save Changes</button>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div style={{ background: P.bgCard, borderRadius: 12, border: `1px solid ${P.border}`, overflow: "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1.5fr 1fr", gap: 0, padding: "14px 20px", background: P.bgInput, borderBottom: `1px solid ${P.border}`, fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>
                   <div>Name</div>
