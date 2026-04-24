@@ -55,11 +55,9 @@ const matchLabel = (s) => s >= 50 ? "STRONG" : s >= 40 ? "GOOD" : s >= 35 ? "POS
 
 function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState("login"); const [fullName, setFullName] = useState(""); const [company, setCompany] = useState("Velani Goods and Services");
   const handleSubmit = async () => {
     setError(""); setLoading(true);
     try {
-      if (mode === "register") { await api("/auth/register", { method: "POST", body: JSON.stringify({ email, password, full_name: fullName, company }) }); setMode("login"); alert("Account created!"); setLoading(false); return; }
       const data = await api("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
       localStorage.setItem("tcc_token", data.access_token); onLogin();
     } catch (e) { setError(e.message); }
@@ -73,20 +71,13 @@ function LoginScreen({ onLogin }) {
           <div><div style={{ fontFamily: font, fontWeight: 700, fontSize: 11, color: P.accent, letterSpacing: 3, textTransform: "uppercase" }}>Velani</div>
           <div style={{ fontFamily: font, fontWeight: 700, fontSize: 16 }}>Tender Command Centre</div></div>
         </div>
-        <div style={{ fontSize: 13, color: P.textMuted, margin: "16px 0 28px" }}>{mode === "login" ? "Sign in to your account" : "Create a new account"}</div>
+        <div style={{ fontSize: 13, color: P.textMuted, margin: "16px 0 28px" }}>Sign in to your account</div>
         {error && <div style={{ background: P.redDim, color: P.red, padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 16 }}>{error}</div>}
-        {mode === "register" && (<>
-          <label style={{ fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Full Name</label>
-          <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your full name" style={{ ...inputStyle, marginBottom: 14 }} />
-          <label style={{ fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Company</label>
-          <input value={company} onChange={e => setCompany(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
-        </>)}
         <label style={{ fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Email</label>
         <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@velani.co.za" type="email" style={{ ...inputStyle, marginBottom: 14 }} onKeyDown={e => e.key === "Enter" && handleSubmit()} />
         <label style={{ fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>Password</label>
         <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="Min 8 characters" style={{ ...inputStyle, marginBottom: 24 }} onKeyDown={e => e.key === "Enter" && handleSubmit()} />
-        <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "12px 24px", background: `linear-gradient(135deg, ${P.accent}, ${P.accentDark})`, color: "#000", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: loading ? "wait" : "pointer", fontFamily: fontBody }}>{loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}</button>
-        <div style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: P.textMuted }}>{mode === "login" ? "No account? " : "Have an account? "}<span onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }} style={{ color: P.accent, cursor: "pointer" }}>{mode === "login" ? "Register" : "Sign In"}</span></div>
+        <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "12px 24px", background: `linear-gradient(135deg, ${P.accent}, ${P.accentDark})`, color: "#000", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: loading ? "wait" : "pointer", fontFamily: fontBody }}>{loading ? "Please wait..." : "Sign In"}</button>
       </div>
     </div>
   );
@@ -96,6 +87,7 @@ export default function App() {
   const [authed, setAuthed] = useState(!!localStorage.getItem("tcc_token"));
   const [tab, setTab] = useState("dashboard");
   const [user, setUser] = useState(null);
+  const [usersList, setUsersList] = useState([]); const [showNewUser, setShowNewUser] = useState(false); const [editingUser, setEditingUser] = useState(null);
   const [stats, setStats] = useState(null);
   const [tenders, setTenders] = useState([]);
   const [rfps, setRfps] = useState([]);
@@ -133,6 +125,8 @@ export default function App() {
   }, [authed, tenderFilter, searchQuery, provinceFilter]);
 
   useEffect(() => { loadData(); }, [loadData]);
+  const loadUsers = useCallback(async () => { if (!authed || user?.role !== "super_admin") return; try { const users = await api("/users"); setUsersList(users); } catch (e) { console.error("Load users error:", e); } }, [authed, user]);
+  useEffect(() => { if (tab === "users") loadUsers(); }, [tab, loadUsers]);
 
   const filteredTenders = velaniOnly ? tenders.filter(t => t.ai_match_score >= 38) : tenders;
 
@@ -168,7 +162,7 @@ export default function App() {
           <div style={{ fontSize: 11, color: P.textMuted, display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: P.green, display: "inline-block", boxShadow: `0 0 8px ${P.green}` }} />System Online | B-BBEE L1</div>
         </div>
         <nav style={{ flex: 1, padding: "12px 8px" }}>
-          {[{ id: "dashboard", icon: "dashboard", label: "Dashboard" }, { id: "discovery", icon: "globe", label: "Tender Discovery" }, { id: "rfp", icon: "rfp", label: "RFP Pricing" }, { id: "sources", icon: "zap", label: "Harvest Sources" }].map(t => (
+          {[{ id: "dashboard", icon: "dashboard", label: "Dashboard" }, { id: "discovery", icon: "globe", label: "Tender Discovery" }, { id: "rfp", icon: "rfp", label: "RFP Pricing" }, { id: "sources", icon: "zap", label: "Harvest Sources" }, ...(user?.role === "super_admin" ? [{ id: "users", icon: "user", label: "Users" }] : [])].map(t => (
             <button key={t.id} onClick={() => { setTab(t.id); setSelectedTender(null); setAiResult(null); }} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "10px 14px", border: "none", borderRadius: 8, cursor: "pointer", marginBottom: 4, background: tab === t.id ? `${P.accent}18` : "transparent", color: tab === t.id ? P.accent : P.textMuted, fontFamily: fontBody, fontSize: 14, fontWeight: tab === t.id ? 600 : 400, borderLeft: tab === t.id ? `3px solid ${P.accent}` : "3px solid transparent" }}>
               <Icon name={t.icon} size={18} />{t.label}
             </button>
@@ -416,6 +410,57 @@ export default function App() {
             )}
           </div>
         )}
+        {/* USERS */}
+          {tab === "users" && user?.role === "super_admin" && (
+            <div style={{ padding: 28 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                <div>
+                  <h1 style={{ fontFamily: font, fontSize: 22, fontWeight: 700, margin: "0 0 6px" }}>Users</h1>
+                  <p style={{ color: P.textMuted, fontSize: 13, margin: 0 }}>{usersList.length} users &mdash; manage staff access</p>
+                </div>
+                <button onClick={() => setShowNewUser(true)} style={{ background: `linear-gradient(135deg, ${P.accent}, ${P.accentDark})`, color: "#000", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 8 }}>
+                  <Icon name="plus" size={16} /> New User
+                </button>
+              </div>
+              <div style={{ background: P.bgCard, borderRadius: 12, border: `1px solid ${P.border}`, overflow: "hidden" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1.5fr 1fr", gap: 0, padding: "14px 20px", background: P.bgInput, borderBottom: `1px solid ${P.border}`, fontSize: 11, color: P.textMuted, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>
+                  <div>Name</div>
+                  <div>Email</div>
+                  <div>Role</div>
+                  <div>Status</div>
+                  <div>Last Login</div>
+                  <div style={{ textAlign: "right" }}>Actions</div>
+                </div>
+                {usersList.map(u => (
+                  <div key={u.id} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1.5fr 1fr", gap: 0, padding: "14px 20px", borderBottom: `1px solid ${P.border}`, alignItems: "center", fontSize: 13 }}>
+                    <div style={{ fontWeight: 500 }}>{u.full_name}</div>
+                    <div style={{ color: P.textMuted, fontSize: 12 }}>{u.email}</div>
+                    <div>
+                      <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 4, fontWeight: 600, textTransform: "uppercase", background: u.role === "super_admin" ? `${P.accent}20` : u.role === "procurement" ? `${P.blue}20` : `${P.textDim}33`, color: u.role === "super_admin" ? P.accent : u.role === "procurement" ? P.blue : P.textMuted }}>
+                        {u.role === "super_admin" ? "Super Admin" : u.role === "procurement" ? "Procurement" : "Viewer"}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 4, fontWeight: 600, textTransform: "uppercase", background: u.is_active ? `${P.green}20` : `${P.red}20`, color: u.is_active ? P.green : P.red }}>
+                        {u.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+                    <div style={{ color: P.textMuted, fontSize: 12 }}>
+                      {u.last_login_at ? new Date(u.last_login_at).toLocaleString() : "Never"}
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <button onClick={() => setEditingUser(u)} style={{ background: `${P.blue}15`, color: P.blue, border: `1px solid ${P.blue}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}>
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {usersList.length === 0 && (
+                  <div style={{ padding: 40, textAlign: "center", color: P.textMuted, fontSize: 13 }}>No users yet</div>
+                )}
+              </div>
+            </div>
+          )}
       </main>
     </div>
   );
