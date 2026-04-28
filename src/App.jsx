@@ -88,6 +88,8 @@ export default function App() {
   const [authed, setAuthed] = useState(!!localStorage.getItem("tcc_token"));
   const [tab, setTab] = useState("dashboard");
   const [user, setUser] = useState(null);
+  const isSuperAdmin = user?.role === "super_admin";
+  const canEdit = user?.role === "super_admin" || user?.role === "procurement";
   const [usersList, setUsersList] = useState([]); const [showNewUser, setShowNewUser] = useState(false); const [editingUser, setEditingUser] = useState(null);
   const [newUser, setNewUser] = useState({ email: "", password: "", full_name: "", company: "Velani Goods and Services", role: "viewer" });
   const [stats, setStats] = useState(null);
@@ -248,7 +250,7 @@ const handleUpdateUser = async () => {
               </div>
               <div style={{ background: P.bgCard, borderRadius: 12, border: `1px solid ${P.border}`, padding: 20 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}><Icon name="rfp" size={16} /><span style={{ fontFamily: font, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Active RFPs</span>
-                  <button onClick={() => { setTab("rfp"); setShowNewRfp(true); }} style={{ marginLeft: "auto", background: P.accent, color: "#000", border: "none", borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}><Icon name="plus" size={14} /> New</button></div>
+                  {canEdit && <button onClick={() => { setTab("rfp"); setShowNewRfp(true); }} style={{ marginLeft: "auto", background: P.accent, color: "#000", border: "none", borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}><Icon name="plus" size={14} /> New</button>}</div>
                 {rfps.length === 0 && <div style={{ fontSize: 13, color: P.textMuted, padding: "20px 0", textAlign: "center" }}>No RFPs yet</div>}
                 {rfps.slice(0, 5).map(r => (
                   <div key={r.id} style={{ padding: "10px 0", borderBottom: `1px solid ${P.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -324,7 +326,7 @@ const handleUpdateUser = async () => {
                 </div>
                 {/* Actions */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
-                  <button onClick={e => { e.stopPropagation(); toggleSaved(t); }} style={{ background: savedTenders.has(t.id) ? `${P.accent}30` : "transparent", border: `1px solid ${P.border}`, borderRadius: 6, padding: 5, cursor: "pointer", color: savedTenders.has(t.id) ? P.accent : P.textMuted }}><Icon name="star" size={14} /></button>
+                  {canEdit && <button onClick={e => { e.stopPropagation(); toggleSaved(t); }} style={{ background: savedTenders.has(t.id) ? `${P.accent}30` : "transparent", border: `1px solid ${P.border}`, borderRadius: 6, padding: 5, cursor: "pointer", color: savedTenders.has(t.id) ? P.accent : P.textMuted }}><Icon name="star" size={14} /></button>}
                   {t.document_url && <a href={t.document_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ background: `${P.blue}18`, border: `1px solid ${P.border}`, borderRadius: 6, padding: 5, cursor: "pointer", color: P.blue, display: "flex" }}><Icon name="download" size={14} /></a>}
                 </div>
               </div>);
@@ -387,7 +389,7 @@ const handleUpdateUser = async () => {
           <div style={{ padding: 28 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
               <div><h1 style={{ fontFamily: font, fontSize: 22, fontWeight: 700, margin: "0 0 6px" }}>RFP Pricing</h1><p style={{ color: P.textMuted, fontSize: 13, margin: 0 }}>Client product/qty requests & supplier pricing</p></div>
-              <button onClick={() => setShowNewRfp(true)} style={{ background: `linear-gradient(135deg, ${P.accent}, ${P.accentDark})`, color: "#000", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 8 }}><Icon name="plus" size={16} /> New RFP</button>
+              {canEdit && <button onClick={() => setShowNewRfp(true)} style={{ background: `linear-gradient(135deg, ${P.accent}, ${P.accentDark})`, color: "#000", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: fontBody, display: "flex", alignItems: "center", gap: 8 }}><Icon name="plus" size={16} /> New RFP</button>}
             </div>
             {showNewRfp && (
               <div style={{ background: P.bgCard, borderRadius: 12, border: `1px solid ${P.accent}40`, padding: 24, marginBottom: 20 }}>
@@ -415,7 +417,7 @@ const handleUpdateUser = async () => {
                       <td style={{ padding: "10px 12px" }}><span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10, color: statusColor(r.status), background: `${statusColor(r.status)}18` }}>{statusLabel(r.status)}</span></td>
                       <td style={{ padding: "10px 12px", fontFamily: font, fontWeight: 600 }}>{r.quote_count}</td>
                       <td style={{ padding: "10px 12px", fontFamily: font, color: r.best_price ? P.green : P.textMuted, fontWeight: 600 }}>{r.best_price || "—"}</td>
-                      <td style={{ padding: "10px 12px" }}><button onClick={() => handleAiPricing(r)} disabled={aiLoading} style={{ background: `${P.accent}18`, color: P.accent, border: `1px solid ${P.accent}40`, borderRadius: 6, padding: "3px 8px", fontSize: 10, fontWeight: 600, cursor: aiLoading ? "wait" : "pointer", fontFamily: fontBody }}><Icon name="ai" size={12} /></button></td>
+                      <td style={{ padding: "10px 12px" }}>{canEdit && <button onClick={() => handleAiPricing(r)} disabled={aiLoading} style={{ background: `${P.accent}18`, color: P.accent, border: `1px solid ${P.accent}40`, borderRadius: 6, padding: "3px 8px", fontSize: 10, fontWeight: 600, cursor: aiLoading ? "wait" : "pointer", fontFamily: fontBody }}><Icon name="ai" size={12} /></button>}</td>
                     </tr>))}</tbody>
                 </table>
               </div>
@@ -435,7 +437,7 @@ const handleUpdateUser = async () => {
                 <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{s.name}</div><div style={{ fontSize: 11, color: P.textMuted, fontFamily: font, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.url}</div></div>
                 <div style={{ textAlign: "center", padding: "0 16px" }}><div style={{ fontFamily: font, fontSize: 16, fontWeight: 700, color: P.blue }}>{(s.tenders_found || 0).toLocaleString()}</div><div style={{ fontSize: 9, color: P.textMuted, textTransform: "uppercase" }}>Found</div></div>
                 <div style={{ textAlign: "right", minWidth: 90 }}><div style={{ fontSize: 11, color: s.status === "active" ? P.green : P.accent, fontWeight: 600, textTransform: "uppercase" }}>{s.status}</div><div style={{ fontSize: 10, color: P.textDim }}>{s.last_sync_at ? new Date(s.last_sync_at).toLocaleString() : "Never"}</div></div>
-                <button onClick={() => handleTriggerScrape(s.id)} style={{ background: `${P.blue}15`, color: P.blue, border: `1px solid ${P.blue}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, whiteSpace: "nowrap" }}>Scrape Now</button>
+ {isSuperAdmin && <button onClick={() => handleTriggerScrape(s.id)} style={{ background: `${P.blue}15`, color: P.blue, border: `1px solid ${P.blue}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, whiteSpace: "nowrap" }}>Scrape Now</button>}
               </div>
             ))}
             {sources.length > 0 && (
