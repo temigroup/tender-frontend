@@ -162,6 +162,17 @@ const handleUpdateUser = async () => {
       showToast("Password reset successfully");
     } catch (e) { showToast(e.message, "error"); }
   };
+  const [showCompanyMenu, setShowCompanyMenu] = useState(false);
+  const handleSwitchCompany = async (companyId) => {
+    if (companyId === user?.active_company_id) { setShowCompanyMenu(false); return; }
+    try {
+      const data = await api(`/auth/switch-company/${companyId}`, { method: "POST" });
+      localStorage.setItem("tcc_token", data.access_token);
+      setShowCompanyMenu(false);
+      showToast("Switched company");
+      window.location.reload();
+    } catch (e) { showToast("Switch failed: " + e.message, "error"); }
+  };
   const handleAddUser = async () => {
     if (!newUser.email || !newUser.password || !newUser.full_name) { showToast("Email, password and name are required", "error"); return; }
     try {
@@ -198,8 +209,25 @@ const handleUpdateUser = async () => {
         <div style={{ padding: "20px 16px 16px", borderBottom: `1px solid ${P.border}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg, ${P.accent}, ${P.accentDark})`, display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="target" size={16} /></div>
-            <div><div style={{ fontFamily: font, fontWeight: 700, fontSize: 10, color: P.accent, letterSpacing: 3, textTransform: "uppercase" }}>Velani</div>
-            <div style={{ fontFamily: font, fontWeight: 700, fontSize: 14 }}>TCC</div></div>
+            <div style={{ position: "relative", flex: 1 }}>
+              <button onClick={() => user?.companies?.length > 1 && setShowCompanyMenu(!showCompanyMenu)} style={{ background: "transparent", border: "none", padding: 0, cursor: user?.companies?.length > 1 ? "pointer" : "default", textAlign: "left", width: "100%", color: "inherit", fontFamily: "inherit" }}>
+                <div style={{ fontFamily: font, fontWeight: 700, fontSize: 10, color: P.accent, letterSpacing: 3, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 4 }}>
+                  {user?.companies?.find(c => c.id === user?.active_company_id)?.name || "Velani"}
+                  {user?.companies?.length > 1 && <span style={{ fontSize: 9 }}>{showCompanyMenu ? "▲" : "▼"}</span>}
+                </div>
+                <div style={{ fontFamily: font, fontWeight: 700, fontSize: 14 }}>TCC</div>
+              </button>
+              {showCompanyMenu && (
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 6, background: P.bgCard, border: `1px solid ${P.border}`, borderRadius: 8, padding: 4, zIndex: 100, boxShadow: "0 8px 16px rgba(0,0,0,0.4)" }}>
+                  {user?.companies?.map(c => (
+                    <button key={c.id} onClick={() => handleSwitchCompany(c.id)} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", background: c.id === user?.active_company_id ? `${P.accent}20` : "transparent", border: "none", borderRadius: 6, color: c.id === user?.active_company_id ? P.accent : P.text, cursor: "pointer", fontFamily: fontBody, fontSize: 12, fontWeight: c.id === user?.active_company_id ? 600 : 400 }}>
+                      {c.name}
+                      <div style={{ fontSize: 10, color: P.textMuted, marginTop: 2 }}>{c.role}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div style={{ fontSize: 11, color: P.textMuted, display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: P.green, display: "inline-block", boxShadow: `0 0 8px ${P.green}` }} />System Online | B-BBEE L1</div>
         </div>
@@ -222,7 +250,7 @@ const handleUpdateUser = async () => {
         {tab === "dashboard" && (
           <div style={{ padding: 28 }}>
             <h1 style={{ fontFamily: font, fontSize: 22, fontWeight: 700, margin: "0 0 6px" }}>Dashboard</h1>
-            <p style={{ color: P.textMuted, fontSize: 13, margin: "0 0 28px" }}>Velani Goods & Services — Tender Operations</p>
+            <p style={{ color: P.textMuted, fontSize: 13, margin: "0 0 28px" }}>{user?.companies?.find(c => c.id === user?.active_company_id)?.name || "Velani"} — Tender Operations</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 28 }}>
               {[{ label: "Active Tenders", value: stats?.total_active_tenders ?? "—", icon: "globe", color: P.blue, sub: `24h: +${stats?.tenders_found_24h ?? 0}` },
                 { label: "Open RFPs", value: stats?.open_rfps ?? "—", icon: "rfp", color: P.accent, sub: `${stats?.quotes_received ?? 0} quotes` },
@@ -268,9 +296,9 @@ const handleUpdateUser = async () => {
           <div style={{ padding: 28 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
               <div><h1 style={{ fontFamily: font, fontSize: 22, fontWeight: 700, margin: "0 0 4px" }}>Tender Discovery</h1>
-                <p style={{ color: P.textMuted, fontSize: 13, margin: 0 }}>{filteredTenders.length} tenders{velaniOnly ? " matching Velani services" : ""} from {sources.length} sources</p></div>
+                <p style={{ color: P.textMuted, fontSize: 13, margin: 0 }}>{filteredTenders.length} tenders{velaniOnly ? " matching top criteria" : ""} from {sources.length} sources</p></div>
               <button onClick={() => setVelaniOnly(!velaniOnly)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", border: `1px solid ${velaniOnly ? P.accent : P.border}`, borderRadius: 8, background: velaniOnly ? `${P.accent}20` : "transparent", color: velaniOnly ? P.accent : P.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}>
-                <Icon name="target" size={16} />{velaniOnly ? "Velani Matches ON" : "Show Velani Matches"}
+                <Icon name="target" size={16} />{velaniOnly ? "Top Matches ON" : "Show Top Matches"}
               </button>
             </div>
 
